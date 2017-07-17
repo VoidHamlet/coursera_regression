@@ -1,0 +1,193 @@
+---
+title: "Regression Models Course Project"
+author: "Polina Filipova"
+date: "July 16, 2017"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+
+<a name="top"></a>
+
+## Overview
+
+This document is generated as a course asignment for the __Regression Models__ course, offered by Johns Hopkins University on Coursera.<br><br>
+
+<blockquote>&nbsp;&nbsp; You work for Motor Trend, a magazine about the automobile industry. Looking at a data set of a collection of cars, they are interested in exploring the relationship between a set of variables and miles per gallon (MPG) (outcome). They are particularly interested in the following two questions:
+
+- &nbsp;&nbsp; Is an automatic or manual transmission better for MPG<br>
+- &nbsp;&nbsp; Quantify the MPG difference between automatic and manual transmissions<br>
+
+&nbsp;&nbsp; Take the <b>mtcars</b> data set and write up an analysis to answer their question using regression models and exploratory data analyses.</blockquote>
+
+The following required steps can be reviewed below:
+
+1.  [Data Overview](#step1) 
+2.  [Automatic vs. Manual Transmission in relation to MPG](#step2) 
+3.  [Conclusion](#step3)
+4.  [Supporting Plots](#step4)
+5.  [All of the R code needed to reproduce the results (numbers, plots, etc.)](#step5) 
+
+
+### <a name="step1"></a>1. Data Overview
+
+The mtcars data set is part of the base R installation.
+
+```{r, echo=TRUE, results='show'}
+
+# As referenced in:
+help(mtcars)
+```
+
+[__R: Motor Trend Car Road Tests__](https://stat.ethz.ch/R-manual/R-devel/library/datasets/html/mtcars.html)
+
+__Description__
+
+The data was extracted from the 1974 Motor Trend US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models).
+
+__Usage__
+
+mtcars
+
+__Format__
+
+A data frame with 32 observations on 11 variables.
+
+[, 1]	mpg - Miles/(US) gallon<br>
+[, 2]	cyl - Number of cylinders<br>
+[, 3]	disp - Displacement (cu.in.)<br>
+[, 4]	hp - Gross horsepower<br>
+[, 5]	drat - Rear axle ratio<br>
+[, 6]	wt - Weight (1000 lbs)<br>
+[, 7]	qsec - 1/4 mile time<br>
+[, 8]	vs - V/S<br>
+[, 9]	am - Transmission (0 = automatic, 1 = manual)<br>
+[,10]	gear - Number of forward gears<br>
+[,11]	carb - Number of carburetors<br>
+
+__Source__
+
+Henderson and Velleman (1981), Building multiple regression models interactively. Biometrics, 37, 391–411.
+
+```{r, echo=TRUE, results='show'}
+# Dimensions:
+dim(mtcars)
+
+# Column names:
+names(mtcars)
+
+# Row names:
+rownames(mtcars)
+```
+
+[Back to Overview](#top)
+
+### <a name="step2"></a>2. Automatic vs. Manual Transmission in relation to MPG
+
+Transmission (mtcars$am) can have one of two values, 0 for automatic and 1 for manual. To evade confusion, we will label them shortly.
+
+A look at the means suggests immediate advantage for manual transmission, if our goal is to get more miles per galon (MPG).
+
+```{r, echo=TRUE, results='show'}
+aggregate(mpg ~ am, data = mtcars, mean)
+```
+
+A visual comparison is available in Figure 1.
+
+#### Hypothesis Testing
+
+On performing a T Test, we see the p-value is (far) less than 0.05 (5% given a confidence interval of 95%).  Therefore, we reject the null hypothesis that there's no difference between the means and conclude that a significant difference does exist. The notion that manual transmission is a stronger factor for MPG increase is confirmed.
+
+```{r, echo=TRUE, results='show'}
+# Factor mtcars$am and add labels for automated and manual transmission
+
+mtcars$am <- as.factor(mtcars$am)
+levels(mtcars$am) <- c("at", "mt")
+
+# Perform T Test
+
+mtcars_at <- mtcars[mtcars$am == "at", ]
+mtcars_mt <- mtcars[mtcars$am == "mt", ]
+t.test(mtcars_at$mpg, mtcars_mt$mpg)
+```
+
+#### Linear Regression Model
+
+Next, we model the data based on the dependence of MPG values of the transmission. The "ammt" estimate suggests that manual tranismission outperforms automated transmission by ~7.25 MPG. Multiple R-squared = Explained variance / Total variance for multiple regression. The variance in the data that can be explained by the type of transmission, is barely 36% (0.3598). Not our best bet.
+
+```{r, echo=TRUE, results='show'}
+mtcars_am_lm <- lm(mpg ~ am, data = mtcars)
+summary(mtcars_am_lm )
+```
+
+How about the rest of the variables?
+
+```{r, echo=TRUE, results='show'}
+mtcars_lm <- lm(mpg ~ ., data = mtcars)
+summary(mtcars_lm)$coeff
+```
+
+With a linear model, it is not possible to identify a leader at a glance. We will use R's embedded step function, to perform the identification for us.
+
+#### Stepwise Regression Model
+
+In a stepwise manner, this function identifies the variables which affect MPG the most. Those appear to be weight and acceleration (quarter miles per second), followed by manual transmission, which tops automated transmission by at least ~2.94 MPG.
+
+The adjusted R squared value (adjusted to evade overfitting, given greater number of predictors) is very close to the Multiple R squared value - overall high, in the 80th percentile. It would appear that data variance is highly explainable using this model.
+
+```{r, echo=TRUE, results='show'}
+mtcars_step = step(lm(data = mtcars, mpg ~ .), trace = 0, steps = 10000)
+summary(mtcars_step)
+```
+
+#### Residuals
+
+"R-squared is a statistical measure of how close the data are to the fitted regression line. (...) R-squared cannot determine whether the coefficient estimates and predictions are biased, which is why you must assess the residual plots."<br>
+-- [Jim Frost](http://blog.minitab.com/blog/adventures-in-statistics-2), ["Regression Analysis: How Do I Interpret R-squared and Assess the Goodness-of-Fit?"]([http://blog.minitab.com/blog/adventures-in-statistics-2/regression-analysis-how-do-i-interpret-r-squared-and-assess-the-goodness-of-fit)
+
+We will do so below, in Figure 2. The distribution of residuals is shown to be normal (Normal Q-Q). Residuals are fairly randomly distributed, i.e. are not relevant to the method (Residuals vs. Fitted). No residuals cross Cook's distance; - there are no influential outliers.
+
+[Back to Overview](#top)
+
+### <a name="step3"></a>3. Conclusion
+
+A manual transmission has a small advantage as opposed to automatic, when it comes to miles per galon (MPG). Weight and acceleration, however, influence MPG to a much greater degree.
+
+[Back to Overview](#top)
+
+### <a name="step4"></a>4. Supporting Plots
+
+#### Figure 1. Correlation between different types of transimssion and MPG
+
+```{r, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+# Note: This R Markdown portion is not "chatty";
+# warnings on package installation are not displayed
+
+if(!require(ggplot2)) { install.packages("ggplot2") }
+library(ggplot2)
+```
+
+```{r, echo=TRUE, results='show'}
+# Create a side by side comparison using boxplots
+
+ggplot(data = mtcars, aes(am, mpg)) + geom_boxplot() + labs(x = "Transmission", y = "MPG", title = "MPG: Automatic Transmission (at) vs Manual Transmission (mt)")
+```
+
+#### Figure 2. Residuals vs. Fitted Line and more
+
+```{r, echo=TRUE, results='show'}
+# Using the stepwise model
+
+plot(mtcars_step)
+```
+
+[Back to Overview](#top)
+
+### <a name="step5"></a>5. All of the R code needed to reproduce the results (numbers, plots, etc.)
+
+Please refer to the parent folder of this GitHub submission for the mtcars_regression.Rmd file.
+
+https://github.com/VoidHamlet/coursera_regression
+
+[Back to Overview](#top)
